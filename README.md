@@ -1,9 +1,9 @@
 # switch-game
 
-*Please clone repository and push your code here.*
+*Please clone repository and push your code here (PHP).*
 
 **Requirements**
-A laravel application which uses websockets and renders webpage with following options
+A laravel application which uses websockets and renders webpage with following realtime page options
  1. Spawn Player Button
  2. Spawn Enemy Button
  3. Game Status Button
@@ -20,4 +20,4 @@ A player has two modes
 
 Every player toggles its state from normal to super for 15 secs after one minute. An enemy kills a player (remove a player from system)  every 2 mins but it cannot kill a player if it is in super mode.
 
-***NOTE***   -  Consider scenarios that there can be multiple enemies and players in the system at the same time. 
+***NOTE***   -  Consider scenarios that there can be multiple enemies and players in the system at the same time. Please use laravel code guidelines wherever applicable.
