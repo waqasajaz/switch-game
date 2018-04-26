@@ -3,6 +3,7 @@ namespace App\Http\Controllers;
 
 use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
+use App\http\Controllers\GameHelper;
 
 class WebSocketController extends Controller implements MessageComponentInterface{
     private $connections = [];
@@ -13,7 +14,8 @@ class WebSocketController extends Controller implements MessageComponentInterfac
      * @throws \Exception
      */
     function onOpen(ConnectionInterface $conn) {
-        $this->connections[$conn->resourceId] = compact('conn') + ['user_data' => [
+        log_and_echo("A new user connected. ResourceID is: $conn->resourceId \n");
+        $this->connections[$conn->resourceId] = ['user_data' => [
             'players' => array(),
             'enemies' => array()
         ]];
@@ -25,14 +27,9 @@ class WebSocketController extends Controller implements MessageComponentInterfac
      * @throws \Exception
      */
     function onClose(ConnectionInterface $conn){
+        log_and_echo("User disconnected. ResourceID is: $conn->resourceId \n");
         $disconnectedId = $conn->resourceId;
         unset($this->connections[$disconnectedId]);
-        foreach($this->connections as &$connection)
-            $connection['conn']->send(json_encode([
-                'offline_user' => $disconnectedId,
-                'from_user_id' => 'server control',
-                'from_resource_id' => null
-            ]));
     }
     
      /**
@@ -43,7 +40,7 @@ class WebSocketController extends Controller implements MessageComponentInterfac
      * @throws \Exception
      */
     function onError(ConnectionInterface $conn, \Exception $e){
-        echo "An error has occurred with user $conn->resourceId]: {$e->getLine()}, {$e->getMessage()}\n";
+        log_and_echo("An error has occurred with user $conn->resourceId: {$e->getLine()}, {$e->getMessage()}\n");
         unset($this->connections[$conn->resourceId]);
         $conn->close();
     }
@@ -55,57 +52,17 @@ class WebSocketController extends Controller implements MessageComponentInterfac
      * @throws \Exception
      */
     function onMessage(ConnectionInterface $conn, $msg) {
+        log_and_echo("Event Receied: $msg \n");
         $userData = $this->connections[$conn->resourceId]['user_data'];
         if ($msg === 'spawn-player') {
-            $player = ['createdAt' => time(), 'killed' => false ];
-            array_push($userData['players'], $player);
+            $userData = GameHelper::spawnPlayer($userData, $conn);
             $this->connections[$conn->resourceId]['user_data'] = $userData;
-            // $conn->send(json_encode($userData));
         } else if ($msg === 'spawn-enemy') {
-            $enemy = ['createdAt' => time() ];
-            array_push($userData['enemies'], $enemy);
+            $userData = GameHelper::spawnEnemy($userData, $conn);
             $this->connections[$conn->resourceId]['user_data'] = $userData;
-            // $conn->send(json_encode($userData));
         } else if ($msg === 'get-status') {
-            $status = [
-                'activePlayers' => 0,
-                'killedPlayers' => 0,
-                'enemies' => count($userData['enemies'])
-            ];
-
-            $currentTime = time();   // current time in seconds
-
-            // find enemies which can kill at this specific time
-            $enemies = $userData['enemies'];
-            $Lethalenemies = [];
-            foreach ($enemies as $enemy) {
-                // enemies which are active after 2 mins
-                if (($currentTime - $enemy['createdAt']) % 120 === 0 ) {
-                    array_push($Lethalenemies, $enemy);
-                }
-            }
-            // if there is any active enemy then search for players which can be killed
-            if (count($Lethalenemies) > 0) {
-                $players = $userData['players'];
-                foreach ($players as $player) {
-                    // only check those players which are not killed
-                    if (!$player['killed']) {
-                        $age = $currentTime - $player['createdAt'];
-                        // check if player is 60 secs (1 min) old and it is not in 15 sec super state
-                        if ($age > 60 && ($age % 60) > 0 && ($age % 60) < 16 ) {
-                            $status['activePlayers']++;
-                        } else {
-                            $status['killedPlayers']++;
-                        }
-
-                    } else {
-                        $status['killedPlayers']++;
-                    }
-                }
-            } else {
-                $status['activePlayers'] = count($userData['players']);
-            }
-            $conn->send(json_encode($status));
+            $userData = GameHelper::processGameStatus($userData, $conn);
+            $this->connections[$conn->resourceId]['user_data'] = $userData;
         }
     }
 }
