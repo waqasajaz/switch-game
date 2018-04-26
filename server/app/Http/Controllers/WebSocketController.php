@@ -55,14 +55,57 @@ class WebSocketController extends Controller implements MessageComponentInterfac
      * @throws \Exception
      */
     function onMessage(ConnectionInterface $conn, $msg) {
-        echo $msg;
         $userData = $this->connections[$conn->resourceId]['user_data'];
-        $conn->send($msg);
-        if($msg === 'spawn-player') {
-            $player = ['time' => time() ];
+        if ($msg === 'spawn-player') {
+            $player = ['createdAt' => time(), 'killed' => false ];
             array_push($userData['players'], $player);
             $this->connections[$conn->resourceId]['user_data'] = $userData;
+            // $conn->send(json_encode($userData));
+        } else if ($msg === 'spawn-enemy') {
+            $enemy = ['createdAt' => time() ];
+            array_push($userData['enemies'], $enemy);
+            $this->connections[$conn->resourceId]['user_data'] = $userData;
+            // $conn->send(json_encode($userData));
+        } else if ($msg === 'get-status') {
+            $status = [
+                'activePlayers' => 0,
+                'killedPlayers' => 0,
+                'enemies' => count($userData['enemies'])
+            ];
+
+            $currentTime = time();   // current time in seconds
+
+            // find enemies which can kill at this specific time
+            $enemies = $userData['enemies'];
+            $Lethalenemies = [];
+            foreach ($enemies as $enemy) {
+                // enemies which are active after 2 mins
+                if (($currentTime - $enemy['createdAt']) % 120 === 0 ) {
+                    array_push($Lethalenemies, $enemy);
+                }
+            }
+            // if there is any active enemy then search for players which can be killed
+            if (count($Lethalenemies) > 0) {
+                $players = $userData['players'];
+                foreach ($players as $player) {
+                    // only check those players which are not killed
+                    if (!$player['killed']) {
+                        $age = $currentTime - $player['createdAt'];
+                        // check if player is 60 secs (1 min) old and it is not in 15 sec super state
+                        if ($age > 60 && ($age % 60) > 0 && ($age % 60) < 16 ) {
+                            $status['activePlayers']++;
+                        } else {
+                            $status['killedPlayers']++;
+                        }
+
+                    } else {
+                        $status['killedPlayers']++;
+                    }
+                }
+            } else {
+                $status['activePlayers'] = count($userData['players']);
+            }
+            $conn->send(json_encode($status));
         }
-        $conn->send(json_encode($userData));
     }
 }

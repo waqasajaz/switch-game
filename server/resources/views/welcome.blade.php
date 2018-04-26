@@ -76,6 +76,10 @@
                     <button onClick="sendEvent('spawn-enemy')">Spawn Enemy</button>
                     <button onClick="sendEvent('get-status')">Game Status</button>
                 </div>
+
+                <div class="results">
+                    <pre id="result"></pre>
+                </div>
             </div>
         </div>
         <script>
@@ -85,6 +89,7 @@
             };
             exampleSocket.onmessage = function (event) {
                 console.log(event.data);
+                document.getElementById("result").innerHTML = event.data;
             }
             function sendEvent(eventName) {
                 exampleSocket.send(eventName); 
